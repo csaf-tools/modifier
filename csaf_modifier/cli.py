@@ -10,6 +10,12 @@ import datetime
 import json
 from pathlib import Path
 import re
+import logging
+from .validate import Validator, DEFAULT_ENDPOINT, DEFAULT_MODE, SUPPORTED_MODES, DEFAULT_PRESETS
+
+logging.basicConfig(level=logging.INFO,
+                    format='%(asctime)s - %(module)s - %(levelname)s - %(message)s')
+
 
 VERSION_INT_REGEXP = re.compile(r'^(0|[1-9][0-9]*)$') # from CSAF 2.0 3.1.11.1
 VERSION_SEMVER_REGEXP = re.compile(
@@ -125,7 +131,30 @@ def main():
         type=argparse.FileType('wt'),
         help="Path to write the modified CSAF document (default: stdout)",
     )
+    parser.add_argument('--force', action='store_true',
+                        help="If used, the converter produces output even if it is invalid "
+                             "(errors occurred during modification). "
+                             "Target use case: best-effort modification to JSON, "
+                             "fix the errors manually, e.g. in Secvisogram.")
+    # Validation
+    parser.add_argument('--no-validation', action='store_true',
+                        help="Deactivate validation by a validator service")
+    parser.add_argument('--validator-endpoint',
+                        default=DEFAULT_ENDPOINT,
+                        help="The URL where the validator service is reachable. "
+                             f"Default: {DEFAULT_ENDPOINT!r}.")
+    parser.add_argument('--validator-mode',
+                        default=DEFAULT_MODE,
+                        help=f"The Validator mode, currently supported: "
+                             f"{','.join(SUPPORTED_MODES)}. Default: {DEFAULT_MODE!r}.")
+    parser.add_argument('--validator-preset',
+                        default=DEFAULT_PRESETS,
+                        help="One or more presets to validate remotely, currently supported: "
+                             "'schema', 'mandatory', 'optional', 'informative', 'basic', "
+                             "'extended', 'full'. Default: 'mandatory'.",
+                             nargs='+')
     args = parser.parse_args()
+    print(args)
 
     csaf_doc = json.load(args.input)
     filename = args.input.name
@@ -133,7 +162,6 @@ def main():
     # test 1 additional property
     new_csaf_doc, new_filename = modify1(deepcopy(csaf_doc), filename, 1)
     new_csaf_doc["document"]["x_test_q7VQf"] = True
-    _write_csaf_doc(args.output, new_csaf_doc)
 
     # test 2 leap second
     new_csaf_doc, new_filename = modify1(deepcopy(csaf_doc), filename, 2)
@@ -145,7 +173,6 @@ def main():
 
     if len(rh) > 2:
         rh[1]["date"] = "2020-12-31T23:59:60Z" # an invalid
-    _write_csaf_doc(args.output, new_csaf_doc)
 
     # test 3 branch category "legacy"
     new_csaf_doc, new_filename = modify1(deepcopy(csaf_doc), filename, 3)
@@ -177,9 +204,6 @@ def main():
             if "known_not_affected" in ps:
                 ps["known_not_affected"].append("ourproduct_old")
 
-    _write_csaf_doc(args.output, new_csaf_doc)
-
-
     # test 4 branches_t category appears multiple times along a path
     new_csaf_doc, new_filename = modify1(deepcopy(csaf_doc), filename, 4)
     pb = new_csaf_doc["product_tree"]["branches"]
@@ -194,6 +218,25 @@ def main():
                  }
             pb[i] = new_branch
             break
+
+    if not args.no_validation:
+        validator = Validator(endpoint=args.validator_endpoint, mode=args.validator_mode,
+                              presets=args.validator_preset)
+        validation_result = validator.validate(new_csaf_doc)
+        if not validation_result[0]:
+            valid_output = False
+            validator.log_result(validation_result[1], logging)
+            if args.force:
+                logging.warning("Some error occurred during validation,"
+                                " but producing output as --force option is used.")
+            else:
+                logging.critical("Some error occurred during validation, can't produce output."
+                                 " To override this, use --force.")
+                sys.exit(1)
+        else:
+            logging.info("CSAF validation successful.")
+    else:
+        logging.info("CSAF validation skipped at user's request.")
 
     _write_csaf_doc(args.output, new_csaf_doc)
 
