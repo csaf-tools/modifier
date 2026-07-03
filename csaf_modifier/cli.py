@@ -11,6 +11,7 @@ import json
 from pathlib import Path
 import re
 import logging
+from uuid import uuid4
 from .validate import Validator, DEFAULT_ENDPOINT, DEFAULT_MODE, SUPPORTED_MODES, DEFAULT_PRESETS
 
 logging.basicConfig(level=logging.INFO,
@@ -22,7 +23,7 @@ VERSION_SEMVER_REGEXP = re.compile(
     r'^(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*)(?:-(?P<prerelease>(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+(?P<buildmetadata>[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$')  # from https://semver.org/ 2.2 FAQ
 
 
-def next_major_revision(last_revision_number: str) -> str:
+def next_major_revision(last_revision_number: str = '0') -> str:
     """
     >>> next_major_revision('3')
     '4'
@@ -31,6 +32,8 @@ def next_major_revision(last_revision_number: str) -> str:
     >>> next_major_revision('0.0.100-pre10+build2')
     '1.0.100-pre10+build2'
     """
+    if not last_revision_number:
+        last_revision_number = '0'
     if VERSION_INT_REGEXP.fullmatch(last_revision_number):
         return str(int(last_revision_number) + 1)
 
@@ -49,14 +52,14 @@ def modify1(csaf_doc: dict, filename: str, test_no:int) -> (dict, str):
     Returns (pointer) to the old and dict and new filename.
     """
     # for easier access
-    d = csaf_doc["document"]
+    d = csaf_doc.get("document", {})
     p = csaf_doc.get("product_tree", None)  # optional
     v = csaf_doc.get("vulnerabilities", None)  # optional
 
     now = rfc3339now()
 
     # change publisher
-    org_publisher = d["publisher"]
+    orgiginal_publisher = d.get("publisher")
     d["publisher"] = {
         "category": "other",
         "name": "Team csaf-testsuite/csaf-2.0-to-csaf-2.1",
@@ -68,19 +71,21 @@ def modify1(csaf_doc: dict, filename: str, test_no:int) -> (dict, str):
                 + datetime.datetime.utcnow().strftime("%Y%m%d-%H%M-")
 
     # tracking section: bump version and put old publisher in revision summary
-    dt = d["tracking"]
-    old_id = dt["id"]
+    dt = d.get("tracking", {})
+    old_id = dt.get("id", str(uuid4()))
     new_id = id_prefix + old_id
 
-    new_version = next_major_revision(dt["version"])
+    new_version = next_major_revision(dt.get("version"))
 
     dt["current_release_date"] = now
     dt["id"] = new_id
+    if "revision_history" not in dt:
+        dt["revision_history"] = []
     dt["revision_history"].append({
         "date": now,
         "number": new_version,
         "summary": "created a test version from " + old_id + \
-                   " from publisher: " + json.dumps(org_publisher),
+                   " from publisher: " + json.dumps(orgiginal_publisher),
         })
     dt["status"] = "final"  # we are at least version 1 so we must be final
     dt["version"] = new_version
@@ -171,8 +176,9 @@ def main():
     leap_second = "2016-12-31T23:59:60Z"  # a valid one
 
     new_csaf_doc["document"]["tracking"]["initial_release_date"] = leap_second
-    rh = new_csaf_doc["document"]["tracking"]["revision_history"]
-    rh[0]["date"] = leap_second
+    rh = new_csaf_doc["document"]["tracking"].get("revision_history", [])
+    if rh:
+        rh[0]["date"] = leap_second
 
     if len(rh) > 2:
         rh[1]["date"] = "2020-12-31T23:59:60Z" # an invalid

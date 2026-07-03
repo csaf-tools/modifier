@@ -10,23 +10,10 @@ from csaf_modifier.cli import modify1
 
 BASIC = json_load((Path(__file__).parent / "csaf_documents/basic.json").open())
 
-EMPTY = {
-    "document": {
-        "publisher": {},
-        "tracking": {
-            "id": "1",
-            "version": "1",
-            "revision_history": []
-        },
-        "references": [],
-    },
-    "references": {},
-}
-
 
 def test_basic():
     modify1(BASIC, "", 1)
 
 
 def test_empty():
-    modify1(EMPTY, "", 1)
+    modify1({}, "", 1)
