@@ -1,0 +1,42 @@
+# SPDX-FileCopyrightText: 2026 German Federal Office for Information Security (BSI) <https://www.bsi.bund.de>
+# Software-Engineering: 2026 Intevation GmbH <https://intevation.de>
+#
+# SPDX-License-Identifier: Apache-2.0
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "csaf-modifier"
+version = "0.1.0"
+description = "CSAF modifier according to the CSAF 2.0 specification (section 9.1.8)"
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.10"
+authors = [
+    { name = "Intevation GmbH", email = "swagner@intevation.de" },
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "attrs",
+    "httpx",
+    ]
+
+[project.scripts]
+csaf-modifier = "csaf_modifier.cli:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-cov",
+]
+
+[tool.setuptools.packages.find]
+include = ["csaf_modifier*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
