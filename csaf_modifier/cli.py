@@ -85,6 +85,9 @@ def modify1(csaf_doc: dict, filename: str, test_no:int) -> (dict, str):
     dt["status"] = "final"  # we are at least version 1 so we must be final
     dt["version"] = new_version
 
+    # make sure "references" exists
+    if "references" not in d:
+        d["references"] = []
     # move self references to external and invent new self
     for ref in d["references"]:
         if ref["category"] == "self":
