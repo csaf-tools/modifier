@@ -59,7 +59,8 @@ def apply_always_changes(csaf_doc: dict, basepath: str, filename: str) -> (dict,
 
     reference_filename = new_filename.name
     reference_url = (basepath + reference_filename) if basepath else reference_filename
-    d["references"].append({
+    # insert self-reference as first element (CSAF spec 2.0 section 9.1.8)
+    d["references"].insert(0, {
         "category": "self",
         "summary": "reference to this modified document",
         "url": reference_url,

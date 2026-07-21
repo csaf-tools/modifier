@@ -32,11 +32,32 @@ def test_empty():
 
 
 def test_basepath_used_for_self_reference():
-    doc, new_filename = apply_always_changes(deepcopy(BASIC), "https://example.com/csaf/", "doc.json")
-    refs = doc["document"]["references"]
-    self_refs = [r for r in refs if r["category"] == "self"]
-    assert len(self_refs) == 1
-    assert self_refs[0]["url"] == "https://example.com/csaf/" + new_filename.name
+    """
+    check that the self-reference is added, as first element of the array /document/references[].
+    (CSAF spec 2.0 section 9.1.8)
+    """
+    # create some references
+    parser = build_parser()
+    args = parser.parse_args([
+        "--reference-url", "https://example.com/advisory",
+        "--reference-summary", "example advisory",
+    ])
+    doc = apply_references(deepcopy(BASIC), args)
+    # add the self-reference
+    doc, new_filename = apply_always_changes(doc, "https://example.com/csaf/", "doc.json")
+    # assert the self-reference is the first one
+    assert doc["document"]["references"] == [
+        {
+            "url": "https://example.com/csaf/" + new_filename.name,
+            "summary": "reference to this modified document",
+            "category": "self",
+        },
+        {
+            "url": "https://example.com/advisory",
+            "summary": "example advisory",
+            "category": "external",
+        }
+    ]
 
 
 def test_no_basepath_falls_back_to_bare_filename():
