@@ -74,6 +74,11 @@ def apply_publisher(csaf_doc: dict, args: Namespace) -> dict:
     Modifies document.publisher
     """
     if not (args.publisher_category and args.publisher_name and args.publisher_namespace):
+        if args.publisher_category or args.publisher_name or args.publisher_namespace:\
+            raise ArgumentTypeError(
+                "All of --publisher-category, --publisher-name and --publisher-namespace "
+                "must be given, if one of them is given")
+        # none of the parameters given
         return csaf_doc
 
     publisher = {

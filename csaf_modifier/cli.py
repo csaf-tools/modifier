@@ -120,9 +120,9 @@ def build_parser() -> argparse.ArgumentParser:
                              f"{','.join(SUPPORTED_MODES)}. Default: {DEFAULT_MODE!r}.")
     parser.add_argument('--validator-preset',
                         default=DEFAULT_PRESETS,
-                        help="One or more presets to validate remotely, currently supported: "
+                        help="One or more validation presets. Currently supported: "
                              "'schema', 'mandatory', 'optional', 'informative', 'basic', "
-                             "'extended', 'full'. Default: 'mandatory'.",
+                             f"'extended', 'full'. Default: {''.join(DEFAULT_PRESETS)}.",
                              nargs='+')
     return parser
 

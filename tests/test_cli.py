@@ -69,8 +69,8 @@ def test_no_basepath_falls_back_to_bare_filename():
 def test_apply_publisher_requires_all_mandatory_fields():
     parser = build_parser()
     args = parser.parse_args(["--publisher-name", "Foo"])
-    doc = apply_publisher(deepcopy(BASIC), args)
-    assert doc["document"]["publisher"] == BASIC["document"]["publisher"]
+    with pytest.raises(argparse.ArgumentTypeError):
+        doc = apply_publisher(deepcopy(BASIC), args)
 
 
 def test_apply_publisher_overrides_when_complete():
