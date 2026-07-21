@@ -8,7 +8,15 @@ import sys
 import json
 import logging
 from .validate import Validator, DEFAULT_ENDPOINT, DEFAULT_MODE, SUPPORTED_MODES, DEFAULT_PRESETS
-from .modifier import apply_always_changes, apply_legal_disclaimer, apply_notes, apply_publisher, NOTE_CATEGORIES
+from .modifier import (
+    apply_always_changes,
+    apply_legal_disclaimer,
+    apply_notes,
+    apply_publisher,
+    apply_references,
+    NOTE_CATEGORIES,
+    REFERENCE_CATEGORIES,
+)
 
 logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(module)s - %(levelname)s - %(message)s')
@@ -24,6 +32,9 @@ def _write_csaf_doc(output_file, csaf_doc):
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """
+    Separating the parser creation allows easier testing
+    """
     parser = argparse.ArgumentParser(
         prog="csaf-modifier",
         description="Modify a CSAF document according to the CSAF 2.0 modifier conformance clause.",
@@ -67,7 +78,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     # Notes
     parser.add_argument('--note-text', action='append', default=[], metavar="TEXT",
-                        help="Add a note to document.notes with this text. Repeatable; "
+                        help="Add a note to document.notes with this text. Repeatable: "
                              "each occurrence starts a new note. If --note-category/"
                              "-title/-audience are used, they must be given exactly as "
                              "many times as --note-text, and are paired up by position.")
@@ -81,6 +92,20 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument('--legal-disclaimer',
                         help="Replace the text of an existing legal_disclaimer note, "
                              "or add one if none exists.")
+
+    # References
+    parser.add_argument('--reference-url', action='append', default=[], metavar="URL",
+                        help="Add an additional entry to document.references with this "
+                             "URL. Repeatable: each occurrence starts a new reference "
+                             "and requires a matching --reference-summary at the same "
+                             "position.")
+    parser.add_argument('--reference-summary', action='append', default=[], metavar="SUMMARY",
+                        help="Summary for the reference at the same position as "
+                             "--reference-url. Required, must match its count exactly.")
+    parser.add_argument('--reference-category', action='append', default=[], metavar="CATEGORY",
+                        help=f"Category for the reference at the same position as "
+                             f"--reference-url. Must be one of {REFERENCE_CATEGORIES}. "
+                             f"Defaults to 'external'.")
 
     # Validation
     parser.add_argument('--no-validation', action='store_true',
@@ -113,6 +138,7 @@ def main():
     new_csaf_doc = apply_publisher(new_csaf_doc, args)
     try:
         new_csaf_doc = apply_notes(new_csaf_doc, args)
+        new_csaf_doc = apply_references(new_csaf_doc, args)
     except argparse.ArgumentTypeError as e:
         parser.error(str(e))
     new_csaf_doc = apply_legal_disclaimer(new_csaf_doc, args)

@@ -11,6 +11,7 @@ from pathlib import Path
 
 
 NOTE_CATEGORIES = ['description', 'details', 'faq', 'general', 'other', 'summary']
+REFERENCE_CATEGORIES = ['external', 'self']
 
 
 def apply_always_changes(csaf_doc: dict, basepath: str, filename: str) -> (dict, str):
@@ -107,7 +108,7 @@ def build_notes(args: Namespace) -> list:
         if values and len(values) != len(texts):
             raise ArgumentTypeError(
                 f"--note-{field} was given {len(values)} time(s) but --note-text "
-                f"was given {len(texts)} time(s); they must match.")
+                f"was given {len(texts)} time(s). The count must match.")
 
     notes = []
     for i, text in enumerate(texts):
@@ -134,6 +135,54 @@ def apply_notes(csaf_doc: dict, args: Namespace) -> dict:
 
     d = csaf_doc.setdefault("document", {})
     d.setdefault("notes", []).extend(notes)
+    return csaf_doc
+
+
+def build_references(args: Namespace) -> list:
+    """
+    Parses references from --reference-url plus paired --reference-summary/
+    --reference-category
+
+    Each --reference-url starts a new reference.
+    --reference-summary is required and must match --reference-url's count
+    exactly.
+    --reference-category is optional but if given must also match.
+    Defaults to 'external'. The values are paired up by position.
+    """
+    urls = args.reference_url or []
+    summaries = args.reference_summary or []
+    categories = args.reference_category or []
+
+    if len(urls) != len(summaries):
+        raise ArgumentTypeError(
+            f"--reference-summary was given {len(summaries)} time(s) but "
+            f"--reference-url was given {len(urls)} time(s). The count must match.")
+    if categories and len(categories) != len(urls):
+        raise ArgumentTypeError(
+            f"--reference-category was given {len(categories)} time(s) but "
+            f"--reference-url was given {len(urls)} time(s). The count must match.")
+
+    references = []
+    for i, url in enumerate(urls):
+        category = categories[i] if categories else 'external'
+        if category not in REFERENCE_CATEGORIES:
+            raise ArgumentTypeError(
+                f"Invalid reference category {category!r}. "
+                f"Must be one of {REFERENCE_CATEGORIES}")
+        references.append({"category": category, "summary": summaries[i], "url": url})
+    return references
+
+
+def apply_references(csaf_doc: dict, args: Namespace) -> dict:
+    """
+    Adds additional entries to document.references
+    """
+    references = build_references(args)
+    if not references:
+        return csaf_doc
+
+    d = csaf_doc.setdefault("document", {})
+    d.setdefault("references", []).extend(references)
     return csaf_doc
 
 

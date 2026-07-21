@@ -15,9 +15,10 @@ from csaf_modifier.cli import (
     apply_legal_disclaimer,
     apply_notes,
     apply_publisher,
+    apply_references,
     build_parser,
 )
-from csaf_modifier.modifier import build_notes
+from csaf_modifier.modifier import build_notes, build_references
 
 BASIC = json_load((Path(__file__).parent / "csaf_documents/basic.json").open())
 
@@ -134,3 +135,61 @@ def test_build_notes_rejects_unknown_category():
     args = parser.parse_args(["--note-text", "hello", "--note-category", "bogus"])
     with pytest.raises(argparse.ArgumentTypeError):
         build_notes(args)
+
+
+def test_apply_references_appends():
+    """
+    simple succeeding example
+    """
+    parser = build_parser()
+    args = parser.parse_args([
+        "--reference-url", "https://example.com/advisory",
+        "--reference-summary", "example advisory",
+    ])
+    doc = apply_references(deepcopy(BASIC), args)
+    refs = doc["document"]["references"]
+    assert refs[-1] == {
+        "category": "external",
+        "summary": "example advisory",
+        "url": "https://example.com/advisory",
+        }
+
+
+def test_apply_references_multiple_paired_by_position():
+    """
+    Two references, 3 arguments each
+    """
+    parser = build_parser()
+    args = parser.parse_args([
+        "--reference-url", "https://example.com/a", "--reference-summary", "A",
+        "--reference-category", "external",
+        "--reference-url", "https://example.com/b", "--reference-summary", "B",
+        "--reference-category", "self",
+    ])
+    doc = apply_references(deepcopy(BASIC), args)
+    refs = doc["document"]["references"]
+    assert refs[-2:] == [
+        {"category": "external", "summary": "A", "url": "https://example.com/a"},
+        {"category": "self", "summary": "B", "url": "https://example.com/b"},
+        ]
+
+
+def test_build_references_requires_matching_summary_count():
+    """
+    missing reference summary
+    """
+    parser = build_parser()
+    args = parser.parse_args(["--reference-url", "https://example.com/a"])
+    with pytest.raises(argparse.ArgumentTypeError):
+        build_references(args)
+
+
+def test_build_references_invalid_unknown_category():
+    parser = build_parser()
+    args = parser.parse_args([
+        "--reference-url", "https://example.com/a",
+        "--reference-summary", "A",
+        "--reference-category", "eve",
+    ])
+    with pytest.raises(argparse.ArgumentTypeError):
+        build_references(args)
