@@ -14,7 +14,22 @@
 # If no filenames are given, all filenames tracked by git are used.
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "$script_dir/util.sh"
+
+info() {
+  echo "${COL_GRAY}$*${COL_NORMAL}"
+}
+
+warn() {
+  echo "${COL_YELLOW}[WARN] ${COL_GRAY}$*${COL_NORMAL}" >&2
+}
+
+error() {
+  echo "${COL_RED}[ERROR] ${COL_GRAY}$*${COL_NORMAL}" >&2
+}
+
+success() {
+    echo "${COL_GREEN}$*${COL_NORMAL}"
+}
 
 COPYRIGHT="SPDX-FileCopyrightText: $(date +%Y) German Federal Office for Information Security (BSI) <https://www.bsi.bund.de>"
 SE_LINE="Software-Engineering: $(date +%Y) Intevation GmbH <https://intevation.de>"

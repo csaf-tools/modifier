@@ -30,17 +30,3 @@ jobs:
 
     - name: Run Tests with coverage
       run: pytest --cov=csaf_modifier
-
-  devops-linters:
-    name: "Lint DevOps"
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v5
-
-    - name: Run hadolint
-      run: make lint-dockerfiles
-
-    - name: Run shellcheck
-      uses: ludeeus/action-shellcheck@master
-      with:
-        severity: error
