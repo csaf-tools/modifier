@@ -53,5 +53,5 @@ def test_validator_basic():
                   "csaf_documents/basic.json").open())
     validator = Validator()
     result = validator.validate(BASIC)
-    assert result[0] is True
+    assert result[0] is True, result[1]
     assert result[1] == []

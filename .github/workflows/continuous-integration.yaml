@@ -11,6 +11,12 @@ jobs:
   service-tests:
     name: "Test CLI Tool"
     runs-on: ubuntu-latest
+    services:
+      csaf-validator:
+        image: ghcr.io/secvisogram/csaf-validator-service:latest
+        ports:
+          - 8082:8082
+
     steps:
     - uses: actions/checkout@v5
 
