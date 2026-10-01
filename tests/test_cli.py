@@ -159,6 +159,34 @@ def test_apply_legal_disclaimer_replaces_when_present():
     assert disclaimers[0]["text"] == "new disclaimer"
 
 
+def test_build_publisher_returns_none_without_parameters():
+    parser = build_parser()
+    assert build_publisher(parser.parse_args([])) is None
+
+
+def test_build_publisher_mandatory_and_optional_parameters():
+    parser = build_parser()
+    args = parser.parse_args([
+        "--publisher-category", "vendor",
+        "--publisher-name", "Name",
+        "--publisher-namespace", "https://example.com/",
+        "--publisher-contact-details", "contact@example.com",
+    ])
+    assert build_publisher(args) == {
+        "category": "vendor",
+        "name": "Name",
+        "namespace": "https://example.com/",
+        "contact_details": "contact@example.com",
+    }
+
+
+def test_build_publisher_rejects_incomplete_parameters():
+    parser = build_parser()
+    args = parser.parse_args(["--publisher-name", "Name"])
+    with pytest.raises(argparse.ArgumentTypeError):
+        build_publisher(args)
+
+
 def test_build_notes_defaults_category():
     parser = build_parser()
     args = parser.parse_args(["--note-text", "hello"])

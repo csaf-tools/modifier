@@ -68,17 +68,22 @@ def apply_always_changes(csaf_doc: dict, basepath: str, filename: str) -> (dict,
     return csaf_doc, new_filename
 
 
-def apply_publisher(csaf_doc: dict, args: Namespace) -> dict:
+def build_publisher(args: Namespace) -> dict:
     """
-    Modifies document.publisher
+    Parses the publisher from --publisher-category, --publisher-name and
+    --publisher-namespace plus the optional --publisher-contact-details and
+    --publisher-issuing-authority
+
+    Returns None if no publisher parameter is given.
+    All three mandatory parameters must be given, if one of them is given.
     """
     if not (args.publisher_category and args.publisher_name and args.publisher_namespace):
-        if args.publisher_category or args.publisher_name or args.publisher_namespace:\
+        if args.publisher_category or args.publisher_name or args.publisher_namespace:
             raise ArgumentTypeError(
                 "All of --publisher-category, --publisher-name and --publisher-namespace "
                 "must be given, if one of them is given")
         # none of the parameters given
-        return csaf_doc
+        return None
 
     publisher = {
         "category": args.publisher_category,
@@ -89,6 +94,16 @@ def apply_publisher(csaf_doc: dict, args: Namespace) -> dict:
         publisher["contact_details"] = args.publisher_contact_details
     if args.publisher_issuing_authority:
         publisher["issuing_authority"] = args.publisher_issuing_authority
+    return publisher
+
+
+def apply_publisher(csaf_doc: dict, args: Namespace) -> dict:
+    """
+    Modifies document.publisher
+    """
+    publisher = build_publisher(args)
+    if not publisher:
+        return csaf_doc
 
     csaf_doc.setdefault("document", {})["publisher"] = publisher
     return csaf_doc
