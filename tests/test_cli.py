@@ -17,6 +17,7 @@ from csaf_modifier.cli import (
     apply_publisher,
     apply_references,
     build_parser,
+    main,
 )
 from csaf_modifier.modifier import build_notes, build_references
 
@@ -71,6 +72,29 @@ def test_apply_publisher_requires_all_mandatory_fields():
     args = parser.parse_args(["--publisher-name", "Foo"])
     with pytest.raises(argparse.ArgumentTypeError):
         doc = apply_publisher(deepcopy(BASIC), args)
+
+
+@pytest.mark.parametrize("args", [
+    # all of them raise ArgumentTypeError
+    ["--publisher-name", "Foo"],
+    ["--note-text", "t", "--note-category", "bogus"],
+    ["--reference-url", "https://example.com/"],
+])
+def test_argument_errors(args, tmp_path, capsys, monkeypatch):
+    """
+    Argument errors should not result in an unhandled exception
+    """
+    doc = tmp_path / "in.json"
+    doc.write_text("{}")
+    monkeypatch.setattr("sys.argv",
+                        ["csaf-modifier", str(doc), "--no-validation"] + args)
+
+    with pytest.raises(SystemExit) as excinfo:
+        main()
+
+    # Exit code 2 are usage errors
+    assert excinfo.value.code == 2
+    assert "csaf-modifier: error:" in capsys.readouterr().err
 
 
 def test_apply_publisher_overrides_when_complete():

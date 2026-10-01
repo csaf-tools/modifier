@@ -135,13 +135,14 @@ def main():
     filename = args.input.name if args.input.name != '<stdin>' else 'stdin.json'
 
     new_csaf_doc, new_filename = apply_always_changes(csaf_doc, args.basepath, filename)
-    new_csaf_doc = apply_publisher(new_csaf_doc, args)
+    # for argument errors shows the message and the usage instead of a traceback
     try:
+        new_csaf_doc = apply_publisher(new_csaf_doc, args)
         new_csaf_doc = apply_notes(new_csaf_doc, args)
         new_csaf_doc = apply_references(new_csaf_doc, args)
-    except argparse.ArgumentTypeError as e:
-        parser.error(str(e))
-    new_csaf_doc = apply_legal_disclaimer(new_csaf_doc, args)
+        new_csaf_doc = apply_legal_disclaimer(new_csaf_doc, args)
+    except argparse.ArgumentTypeError as exc:
+        parser.error(str(exc))
 
     if not args.no_validation:
         validator = Validator(endpoint=args.validator_endpoint, mode=args.validator_mode,
