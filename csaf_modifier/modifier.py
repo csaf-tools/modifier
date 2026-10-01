@@ -6,7 +6,7 @@
 from argparse import ArgumentTypeError, Namespace
 from datetime import datetime, timezone
 from logging import getLogger
-from .utils import next_major_revision, rfc3339now
+from .utils import next_major_revision, rfc3339now, version_forces_draft
 from pathlib import Path
 
 logger = getLogger(__name__)
@@ -31,6 +31,10 @@ def apply_always_changes(csaf_doc: dict, filename: str) -> (dict, str):
     Tracking ID:
     - "does not have the same /document/tracking/id as the original document."
     - A document without an ID gets a new one based on the current date and time.
+
+    Status:
+    - A "draft" only required by the old version becomes "final" when the
+      version increment leaves that state. Any other status is left unchanged.
     """
     # for easier access
     d = csaf_doc.get("document", {})
@@ -47,7 +51,8 @@ def apply_always_changes(csaf_doc: dict, filename: str) -> (dict, str):
     # without an old id just use the generated prefix
     new_id = id_prefix + old_id if old_id else id_prefix[:-1]
 
-    new_version = next_major_revision(dt.get("version"))
+    old_version = dt.get("version")
+    new_version = next_major_revision(old_version)
 
     dt["current_release_date"] = now
     dt["id"] = new_id
@@ -58,7 +63,12 @@ def apply_always_changes(csaf_doc: dict, filename: str) -> (dict, str):
         "number": new_version,
         "summary": "created a modified version from " + (old_id or "an id-less document"),
         })
-    dt["status"] = "final"  # we are at least version 1 so we must be final
+
+    # Bump the status to "final" if draft is no longer required by the version number
+    if dt.get("status") == "draft" \
+            and version_forces_draft(old_version) \
+            and not version_forces_draft(new_version):
+        dt["status"] = "final"
     dt["version"] = new_version
 
     new_filename = Path(filename).parent / Path(id_prefix + Path(filename).name)

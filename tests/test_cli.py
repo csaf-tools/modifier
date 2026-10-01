@@ -91,6 +91,60 @@ def test_self_reference_conversion():
     ]
 
 
+def test_status_untouched():
+    """
+    final stays final
+    """
+    doc, _ = apply_always_changes(deepcopy(BASIC), "doc.json")
+    assert doc["document"]["tracking"]["status"] == "final"
+
+
+def test_status_becomes_final():
+    """
+    0.1.0 draft → 1.1.0 final
+    """
+    doc = deepcopy(BASIC)
+    doc["document"]["tracking"]["status"] = "draft"
+    doc["document"]["tracking"]["version"] = "0.1.0"
+    doc, _ = apply_always_changes(doc, "doc.json")
+    assert doc["document"]["tracking"]["status"] == "final"
+    assert doc["document"]["tracking"]["version"] == "1.1.0"
+
+
+def test_status_prerelease():
+    """
+    pre-release versions stays at draft
+    """
+    doc = deepcopy(BASIC)
+    doc["document"]["tracking"]["status"] = "draft"
+    doc["document"]["tracking"]["version"] = "1.0.0-rc1"
+    doc, _ = apply_always_changes(doc, "doc.json")
+    assert doc["document"]["tracking"]["status"] == "draft"
+    assert doc["document"]["tracking"]["version"] == "2.0.0-rc1"
+
+
+def test_draft_constant():
+    """
+    If "draft" is not required by the version number, keep it
+    """
+    doc = deepcopy(BASIC)
+    doc["document"]["tracking"]["status"] = "draft"
+    doc["document"]["tracking"]["version"] = "2"
+    doc, _ = apply_always_changes(doc, "doc.json")
+    assert doc["document"]["tracking"]["status"] == "draft"
+
+
+def test_status_interim():
+    """
+    Don't touch "interim"
+    """
+    doc = deepcopy(BASIC)
+    doc["document"]["tracking"]["status"] = "interim"
+    doc["document"]["tracking"]["version"] = "0.1.0"
+    doc, _ = apply_always_changes(doc, "doc.json")
+    assert doc["document"]["tracking"]["status"] == "interim"
+
+
 def test_apply_publisher_requires_all_mandatory_fields():
     parser = build_parser()
     args = parser.parse_args(["--publisher-name", "Foo"])

@@ -19,6 +19,8 @@ CSAF modifier according to the specification: https://docs.oasis-open.org/csaf/c
     - add new references
 - It always
     - changes the document tracking ID
+    - bumps the major version and adds a revision history entry
+    - sets the status to `final` if the old version required a `draft` status
     - adds a reference to the original CSAF document as the first reference
     - converts the original self-reference into an external one
     - adds a new self-reference for the modified document
@@ -60,6 +62,22 @@ Both the input and the output CSAF document can be either files or stdin/stdout.
 |----------|-------|---------|-------------|
 | positional | `-` (stdin) | Input file name | Path to the input CSAF document |
 | `-o` or `--output` | `-` (stdout) | Output file name | Path to write the modified CSAF document |
+
+### Document status
+
+The status handling needs no configuration.
+
+The CSAF specification requires the status `draft` for version specifications with with major version `0` and pre-release versions (CSAF 2.0 specification sections 3.1.11.1 and 3.1.11.2).
+With the automatic increament of the major version, a document may loose the requirement for the `draft` state.
+Then the status is set to `final`.
+
+| Old version | Old status | New version | New status |
+|-------------|------------|-------------|------------|
+| `0`         | `draft`    | `1`         | `final`    |
+| `0.1.0`     | `draft`    | `1.1.0`     | `final`    |
+| `1.0.0-rc1` | `draft`    | `2.0.0-rc1` | `draft`    |
+| `2`         | `draft`    | `3`         | `draft`    |
+| `1`         | `interim`  | `2`         | `interim`  |
 
 ### Reference handling
 

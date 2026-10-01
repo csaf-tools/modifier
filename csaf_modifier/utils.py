@@ -12,6 +12,28 @@ VERSION_SEMVER_REGEXP = re_compile(
     r'^(?P<major>0|[1-9]\d*)\.(?P<minor>0|[1-9]\d*)\.(?P<patch>0|[1-9]\d*)(?:-(?P<prerelease>(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\.(?:0|[1-9]\d*|\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\+(?P<buildmetadata>[0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?$')  # from https://semver.org/ 2.2 FAQ
 
 
+# Versions that MUST have the document status "draft":
+# integer 0, semver 0.y.z and semver with a pre-release part
+VERSION_FORCES_DRAFT_REGEXP = re_compile(
+    r'^0$|^0\.\d+\.\d+(?:[+-].*)?$|^\d+\.\d+\.\d+-')
+
+
+def version_forces_draft(version: str) -> bool:
+    """
+    Whether the version requires the document status to be "draft"
+
+    >>> version_forces_draft('0')
+    True
+    >>> version_forces_draft('0.1.0')
+    True
+    >>> version_forces_draft('1.0.0-rc1')
+    True
+    >>> version_forces_draft('1.0.0')
+    False
+    """
+    return version and VERSION_FORCES_DRAFT_REGEXP.match(version)
+
+
 def next_major_revision(last_revision_number: str = '0') -> str:
     """
     >>> next_major_revision('3')
