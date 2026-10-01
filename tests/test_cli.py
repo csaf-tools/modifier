@@ -24,46 +24,125 @@ BASIC = json_load((Path(__file__).parent / "csaf_documents/basic.json").open())
 
 
 def test_basic():
-    apply_always_changes(deepcopy(BASIC), None, "")
+    apply_always_changes(deepcopy(BASIC), "")
 
 
 def test_empty():
-    apply_always_changes({}, None, "")
+    apply_always_changes({}, "")
 
 
-def test_basepath_used_for_self_reference():
+def test_new_id_differs_from_original():
     """
-    check that the self-reference is added, as first element of the array /document/references[].
-    (CSAF spec 2.0 section 9.1.8)
+    The modified document "does not have the same /document/tracking/id as the
+    original document" and SHOULD NOT use the original as a prefix, so the
+    original is appended as a suffix (CSAF spec 2.0 section 9.1.8).
     """
-    # create some references
-    parser = build_parser()
-    args = parser.parse_args([
-        "--reference-url", "https://example.com/advisory",
-        "--reference-summary", "example advisory",
-    ])
-    doc = apply_references(deepcopy(BASIC), args)
-    # add the self-reference
-    doc, new_filename = apply_always_changes(doc, "https://example.com/csaf/", "doc.json")
-    # assert the self-reference is the first one
+    doc, _ = apply_always_changes(deepcopy(BASIC), "doc.json")
+    old_id = BASIC["document"]["tracking"]["id"]
+    assert doc["document"]["tracking"]["id"] != old_id
+    assert doc["document"]["tracking"]["id"].endswith(old_id)
+    assert not doc["document"]["tracking"]["id"].startswith(old_id)
+
+
+def test_missing_tracking_id():
+    doc = deepcopy(BASIC)
+    del doc["document"]["tracking"]["id"]
+    doc, new_filename = apply_always_changes(doc, "doc.json")
+    dt = doc["document"]["tracking"]
+    assert new_filename.name == dt["id"] + "-doc.json"
+    assert not dt["id"].endswith("-")
+    assert "an id-less document" in dt["revision_history"][-1]["summary"]
+
+
+def test_no_references():
+    """
+    basic.json has no references, no changes can/must be made
+    """
+    doc, _ = apply_always_changes(deepcopy(BASIC), "doc.json")
+    assert doc["document"].get("references", []) == []
+
+
+def test_self_reference_conversion():
+    """
+    The previous self-reference self-reference must be converted to "external"
+    The new self-reference is appended to the end
+    """
+    doc = deepcopy(BASIC)
+    doc["document"]["references"] = [
+        {"category": "self", "summary": "This is me", "url": "https://example.com/csaf/orig.json"},
+    ]
+    doc, new_filename = apply_always_changes(doc, "doc.json")
     assert doc["document"]["references"] == [
         {
-            "url": "https://example.com/csaf/" + new_filename.name,
-            "summary": "reference to this modified document",
-            "category": "self",
+            "category": "external",
+            "summary": "original document before modification",
+            "url": "https://example.com/csaf/orig.json",
         },
         {
-            "url": "https://example.com/advisory",
-            "summary": "example advisory",
             "category": "external",
-        }
+            "summary": "This is me",
+            "url": "https://example.com/csaf/orig.json",
+        },
+        {
+            "category": "self",
+            "summary": "Reference to this document",
+            "url": "https://example.com/csaf/" + new_filename.name,
+        },
     ]
 
 
-def test_no_basepath_falls_back_to_bare_filename():
-    doc, new_filename = apply_always_changes(deepcopy(BASIC), None, "doc.json")
-    self_refs = [r for r in doc["document"]["references"] if r["category"] == "self"]
-    assert self_refs[0]["url"] == new_filename.name
+def test_status_untouched():
+    """
+    final stays final
+    """
+    doc, _ = apply_always_changes(deepcopy(BASIC), "doc.json")
+    assert doc["document"]["tracking"]["status"] == "final"
+
+
+def test_status_becomes_final():
+    """
+    0.1.0 draft → 1.1.0 final
+    """
+    doc = deepcopy(BASIC)
+    doc["document"]["tracking"]["status"] = "draft"
+    doc["document"]["tracking"]["version"] = "0.1.0"
+    doc, _ = apply_always_changes(doc, "doc.json")
+    assert doc["document"]["tracking"]["status"] == "final"
+    assert doc["document"]["tracking"]["version"] == "1.1.0"
+
+
+def test_status_prerelease():
+    """
+    pre-release versions stays at draft
+    """
+    doc = deepcopy(BASIC)
+    doc["document"]["tracking"]["status"] = "draft"
+    doc["document"]["tracking"]["version"] = "1.0.0-rc1"
+    doc, _ = apply_always_changes(doc, "doc.json")
+    assert doc["document"]["tracking"]["status"] == "draft"
+    assert doc["document"]["tracking"]["version"] == "2.0.0-rc1"
+
+
+def test_draft_constant():
+    """
+    If "draft" is not required by the version number, keep it
+    """
+    doc = deepcopy(BASIC)
+    doc["document"]["tracking"]["status"] = "draft"
+    doc["document"]["tracking"]["version"] = "2"
+    doc, _ = apply_always_changes(doc, "doc.json")
+    assert doc["document"]["tracking"]["status"] == "draft"
+
+
+def test_status_interim():
+    """
+    Don't touch "interim"
+    """
+    doc = deepcopy(BASIC)
+    doc["document"]["tracking"]["status"] = "interim"
+    doc["document"]["tracking"]["version"] = "0.1.0"
+    doc, _ = apply_always_changes(doc, "doc.json")
+    assert doc["document"]["tracking"]["status"] == "interim"
 
 
 def test_apply_publisher_requires_all_mandatory_fields():

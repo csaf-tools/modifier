@@ -58,11 +58,6 @@ def build_parser() -> argparse.ArgumentParser:
                              "(errors occurred during modification). "
                              "Target use case: best-effort modification to JSON, "
                              "fix the errors manually, e.g. in Secvisogram.")
-    parser.add_argument('--basepath',
-                        help="Base URL to prefix the new document's filename with, used to "
-                             "build the new self reference. If omitted, the bare filename "
-                             "is used. Required for a valid document.")
-
     # Publisher
     parser.add_argument('--publisher-category', choices=PUBLISHER_CATEGORIES,
                         help="If set (together with --publisher-name and "
@@ -134,7 +129,7 @@ def main():
     csaf_doc = json.load(args.input)
     filename = args.input.name if args.input.name != '<stdin>' else 'stdin.json'
 
-    new_csaf_doc, new_filename = apply_always_changes(csaf_doc, args.basepath, filename)
+    new_csaf_doc, new_filename = apply_always_changes(csaf_doc, filename)
     new_csaf_doc = apply_publisher(new_csaf_doc, args)
     try:
         new_csaf_doc = apply_notes(new_csaf_doc, args)
