@@ -31,6 +31,29 @@ def test_empty():
     apply_always_changes({}, "")
 
 
+def test_new_id_differs_from_original():
+    """
+    The modified document "does not have the same /document/tracking/id as the
+    original document" and SHOULD NOT use the original as a prefix, so the
+    original is appended as a suffix (CSAF spec 2.0 section 9.1.8).
+    """
+    doc, _ = apply_always_changes(deepcopy(BASIC), "doc.json")
+    old_id = BASIC["document"]["tracking"]["id"]
+    assert doc["document"]["tracking"]["id"] != old_id
+    assert doc["document"]["tracking"]["id"].endswith(old_id)
+    assert not doc["document"]["tracking"]["id"].startswith(old_id)
+
+
+def test_missing_tracking_id():
+    doc = deepcopy(BASIC)
+    del doc["document"]["tracking"]["id"]
+    doc, new_filename = apply_always_changes(doc, "doc.json")
+    dt = doc["document"]["tracking"]
+    assert new_filename.name == dt["id"] + "-doc.json"
+    assert not dt["id"].endswith("-")
+    assert "an id-less document" in dt["revision_history"][-1]["summary"]
+
+
 def test_no_references():
     """
     basic.json has no references, no changes can/must be made

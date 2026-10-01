@@ -3,7 +3,7 @@
 #
 # SPDX-License-Identifier: Apache-2.0
 
-from datetime import datetime
+from datetime import datetime, timezone
 from re import compile as re_compile
 
 VERSION_INT_REGEXP = re_compile(r'^(0|[1-9][0-9]*)$') # from CSAF 2.0 3.1.11.1
@@ -34,4 +34,5 @@ def rfc3339now():
     """
     Return now() as rfc3339 in UTC without microseconds
     """
-    return datetime.utcnow().isoformat(timespec='seconds') + "Z"
+    # CSAF wants the "Z" suffix, isoformat() writes the offset as "+00:00"
+    return datetime.now(timezone.utc).isoformat(timespec='seconds').replace("+00:00", "Z")

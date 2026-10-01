@@ -4,9 +4,8 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from argparse import ArgumentTypeError, Namespace
-from datetime import datetime
+from datetime import datetime, timezone
 from logging import getLogger
-from uuid import uuid4
 from .utils import next_major_revision, rfc3339now
 from pathlib import Path
 
@@ -22,10 +21,16 @@ def apply_always_changes(csaf_doc: dict, filename: str) -> (dict, str):
     Applies the changes that are always made to a csaf document:
     bump the tracking id & version and rotate the references
 
-    Reference handling follows CSAF spec section 9.1.8:
+    Handling follows CSAF spec section 9.1.8.
+
+    References:
     - "includes a reference to the original advisory as first element of the array /document/references[]."
     - Change the original self-reference to an external reference
     - Add a new self-reference for the modified document, based on the original self-reference URL
+
+    Tracking ID:
+    - "does not have the same /document/tracking/id as the original document."
+    - A document without an ID gets a new one based on the current date and time.
     """
     # for easier access
     d = csaf_doc.get("document", {})
@@ -33,12 +38,14 @@ def apply_always_changes(csaf_doc: dict, filename: str) -> (dict, str):
     now = rfc3339now()
 
     # prefix for new id and filename
-    id_prefix = "csaf-modifier-" + datetime.utcnow().strftime("%Y%m%d-%H%M-")
+    id_prefix = "csaf-modifier-" + datetime.now(timezone.utc).strftime("%Y%m%d-%H%M-")
 
     # tracking section: bump version
     dt = d.get("tracking", {})
-    old_id = dt.get("id", str(uuid4()))
-    new_id = id_prefix + old_id
+    old_id = dt.get("id")
+    # new id should not use the old id as prefix, so use it as postfix
+    # without an old id just use the generated prefix
+    new_id = id_prefix + old_id if old_id else id_prefix[:-1]
 
     new_version = next_major_revision(dt.get("version"))
 
@@ -49,7 +56,7 @@ def apply_always_changes(csaf_doc: dict, filename: str) -> (dict, str):
     dt["revision_history"].append({
         "date": now,
         "number": new_version,
-        "summary": "created a modified version from " + old_id,
+        "summary": "created a modified version from " + (old_id or "an id-less document"),
         })
     dt["status"] = "final"  # we are at least version 1 so we must be final
     dt["version"] = new_version
