@@ -7,7 +7,7 @@ SPDX-License-Identifier: Apache-2.0
 
 # CSAF Modifier Tool
 
-CSAF modifier according to the specification: https://docs.oasis-open.org/csaf/csaf/v2.0/os/csaf-v2.0-os.html#918-conformance-clause-8-csaf-modifier
+CSAF modifier according to the CSAF 2.0 specification: https://docs.oasis-open.org/csaf/csaf/v2.0/os/csaf-v2.0-os.html#918-conformance-clause-8-csaf-modifier
 
 ## How it works
 
