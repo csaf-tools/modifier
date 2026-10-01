@@ -19,7 +19,9 @@ CSAF modifier according to the specification: https://docs.oasis-open.org/csaf/c
     - add new references
 - It always
     - changes the document tracking ID
-    - adds a reference to the original CSAF document
+    - adds a reference to the original CSAF document as the first reference
+    - converts the original self-reference into an external one
+    - adds a new self-reference for the modified document
 - Validates the conformity of the resulting modified CSAF document
 - Writes the result to the output file or stdout
 
@@ -59,11 +61,21 @@ Both the input and the output CSAF document can be either files or stdin/stdout.
 | positional | `-` (stdin) | Input file name | Path to the input CSAF document |
 | `-o` or `--output` | `-` (stdout) | Output file name | Path to write the modified CSAF document |
 
-### Self-reference
+### Reference handling
 
-| Argument | Value | Default | Description |
-|----------|-------|---------|-------------|
-| `--basepath` | basepath | - | Base URL to prefix the new document's filename with, used to build the new self reference. If omitted, the bare filename is used. Required for a valid document |
+The reference handling needs no configuration.
+
+For example, when the input document has the self-reference `https://example.com/csaf/orig.json`, then the resulting document has the following reference changes:
+
+| Position | Category | URL |
+|----------|----------|-----|
+| first | `external` | `https://example.com/csaf/orig.json` (the original self-reference) |
+| last | `self` | `https://example.com/csaf/csaf-modifier-<date>-<filename>` (the new self-reference) |
+
+The new self-reference URL is derived from the original self-reference's path.
+
+If the input document has no self-reference, the CSAF modifier logs a warning and leaves
+`/document/references[]` unchanged.
 
 ### CSAF validation
 

@@ -5,19 +5,27 @@
 
 from argparse import ArgumentTypeError, Namespace
 from datetime import datetime
+from logging import getLogger
 from uuid import uuid4
 from .utils import next_major_revision, rfc3339now
 from pathlib import Path
+
+logger = getLogger(__name__)
 
 
 NOTE_CATEGORIES = ['description', 'details', 'faq', 'general', 'other', 'summary']
 REFERENCE_CATEGORIES = ['external', 'self']
 
 
-def apply_always_changes(csaf_doc: dict, basepath: str, filename: str) -> (dict, str):
+def apply_always_changes(csaf_doc: dict, filename: str) -> (dict, str):
     """
     Applies the changes that are always made to a csaf document:
     bump the tracking id & version and rotate the references
+
+    Reference handling follows CSAF spec section 9.1.8:
+    - "includes a reference to the original advisory as first element of the array /document/references[]."
+    - Change the original self-reference to an external reference
+    - Add a new self-reference for the modified document, based on the original self-reference URL
     """
     # for easier access
     d = csaf_doc.get("document", {})
@@ -51,20 +59,30 @@ def apply_always_changes(csaf_doc: dict, basepath: str, filename: str) -> (dict,
     # make sure "references" exists
     if "references" not in d:
         d["references"] = []
-    # move self references to external and invent new self
-    for ref in d["references"]:
-        if ref["category"] == "self":
-            ref["category"] = "external"
-            ref["summary"] = "original " + ref["summary"]
 
-    reference_filename = new_filename.name
-    reference_url = (basepath + reference_filename) if basepath else reference_filename
-    # insert self-reference as first element (CSAF spec 2.0 section 9.1.8)
-    d["references"].insert(0, {
-        "category": "self",
-        "summary": "reference to this modified document",
-        "url": reference_url,
-        })
+    original_self_ref = next((ref for ref in d["references"]
+                               if ref.get("category") == "self"), None)
+    if original_self_ref:
+        # fallback to empty string, resulting in just the filename
+        original_url = original_self_ref.get("url", "")
+        original_self_ref["category"] = "external"
+        # insert the reference to the original advisory at the start
+        d["references"].insert(0, {
+            "category": "external",
+            "summary": "original document before modification",
+            })
+        if original_url:
+            d["references"][0]["url"] = original_url
+        # add a new self-reference for the modified document itself
+        d["references"].append({
+            "category": "self",
+            "summary": "Reference to this document",
+            "url": f"{original_url.rsplit('/', 1)[0]}/{new_filename.name}",
+            })
+    else:
+        logger.warning("Input document has no 'self' reference. "
+                        "Cannot add a reference to the original advisory "
+                        "as required by the CSAF modifier conformance clause.")
 
     return csaf_doc, new_filename
 

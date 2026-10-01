@@ -24,46 +24,48 @@ BASIC = json_load((Path(__file__).parent / "csaf_documents/basic.json").open())
 
 
 def test_basic():
-    apply_always_changes(deepcopy(BASIC), None, "")
+    apply_always_changes(deepcopy(BASIC), "")
 
 
 def test_empty():
-    apply_always_changes({}, None, "")
+    apply_always_changes({}, "")
 
 
-def test_basepath_used_for_self_reference():
+def test_no_references():
     """
-    check that the self-reference is added, as first element of the array /document/references[].
-    (CSAF spec 2.0 section 9.1.8)
+    basic.json has no references, no changes can/must be made
     """
-    # create some references
-    parser = build_parser()
-    args = parser.parse_args([
-        "--reference-url", "https://example.com/advisory",
-        "--reference-summary", "example advisory",
-    ])
-    doc = apply_references(deepcopy(BASIC), args)
-    # add the self-reference
-    doc, new_filename = apply_always_changes(doc, "https://example.com/csaf/", "doc.json")
-    # assert the self-reference is the first one
+    doc, _ = apply_always_changes(deepcopy(BASIC), "doc.json")
+    assert doc["document"].get("references", []) == []
+
+
+def test_self_reference_conversion():
+    """
+    The previous self-reference self-reference must be converted to "external"
+    The new self-reference is appended to the end
+    """
+    doc = deepcopy(BASIC)
+    doc["document"]["references"] = [
+        {"category": "self", "summary": "This is me", "url": "https://example.com/csaf/orig.json"},
+    ]
+    doc, new_filename = apply_always_changes(doc, "doc.json")
     assert doc["document"]["references"] == [
         {
-            "url": "https://example.com/csaf/" + new_filename.name,
-            "summary": "reference to this modified document",
-            "category": "self",
+            "category": "external",
+            "summary": "original document before modification",
+            "url": "https://example.com/csaf/orig.json",
         },
         {
-            "url": "https://example.com/advisory",
-            "summary": "example advisory",
             "category": "external",
-        }
+            "summary": "This is me",
+            "url": "https://example.com/csaf/orig.json",
+        },
+        {
+            "category": "self",
+            "summary": "Reference to this document",
+            "url": "https://example.com/csaf/" + new_filename.name,
+        },
     ]
-
-
-def test_no_basepath_falls_back_to_bare_filename():
-    doc, new_filename = apply_always_changes(deepcopy(BASIC), None, "doc.json")
-    self_refs = [r for r in doc["document"]["references"] if r["category"] == "self"]
-    assert self_refs[0]["url"] == new_filename.name
 
 
 def test_apply_publisher_requires_all_mandatory_fields():
