@@ -16,10 +16,13 @@ NOTE_CATEGORIES = ['description', 'details', 'faq', 'general', 'other', 'summary
 REFERENCE_CATEGORIES = ['external', 'self']
 
 
-def apply_always_changes(csaf_doc: dict, filename: str) -> (dict, str):
+def apply_always_changes(csaf_doc: dict, filename: str,
+                         args: Namespace = None) -> (dict, str):
     """
     Applies the changes that are always made to a csaf document:
     bump the tracking id & version and rotate the references
+
+    The revision history summary describes the changes derived from args
 
     Handling follows CSAF spec section 9.1.8.
 
@@ -36,8 +39,7 @@ def apply_always_changes(csaf_doc: dict, filename: str) -> (dict, str):
     - A "draft" only required by the old version becomes "final" when the
       version increment leaves that state. Any other status is left unchanged.
     """
-    # for easier access
-    d = csaf_doc.get("document", {})
+    d = csaf_doc.setdefault("document", {})
 
     now = rfc3339now()
 
@@ -45,7 +47,7 @@ def apply_always_changes(csaf_doc: dict, filename: str) -> (dict, str):
     id_prefix = "csaf-modifier-" + datetime.now(timezone.utc).strftime("%Y%m%d-%H%M-")
 
     # tracking section: bump version
-    dt = d.get("tracking", {})
+    dt = d.setdefault("tracking", {})
     old_id = dt.get("id")
     # new id should not use the old id as prefix, so use it as postfix
     # without an old id just use the generated prefix
@@ -58,10 +60,12 @@ def apply_always_changes(csaf_doc: dict, filename: str) -> (dict, str):
     dt["id"] = new_id
     if "revision_history" not in dt:
         dt["revision_history"] = []
+    changes = describe_changes(args) if args else []
     dt["revision_history"].append({
         "date": now,
         "number": new_version,
-        "summary": "created a modified version from " + (old_id or "an id-less document"),
+        "summary": ", ".join(changes) if changes
+                   else "created a modified version from " + (old_id or "an id-less document"),
         })
 
     # Bump the status to "final" if draft is no longer required by the version number
@@ -104,17 +108,22 @@ def apply_always_changes(csaf_doc: dict, filename: str) -> (dict, str):
     return csaf_doc, new_filename
 
 
-def apply_publisher(csaf_doc: dict, args: Namespace) -> dict:
+def build_publisher(args: Namespace) -> dict:
     """
-    Modifies document.publisher
+    Parses the publisher from --publisher-category, --publisher-name and
+    --publisher-namespace plus the optional --publisher-contact-details and
+    --publisher-issuing-authority
+
+    Returns None if no publisher parameter is given.
+    All three mandatory parameters must be given, if one of them is given.
     """
     if not (args.publisher_category and args.publisher_name and args.publisher_namespace):
-        if args.publisher_category or args.publisher_name or args.publisher_namespace:\
+        if args.publisher_category or args.publisher_name or args.publisher_namespace:
             raise ArgumentTypeError(
                 "All of --publisher-category, --publisher-name and --publisher-namespace "
                 "must be given, if one of them is given")
         # none of the parameters given
-        return csaf_doc
+        return None
 
     publisher = {
         "category": args.publisher_category,
@@ -125,6 +134,16 @@ def apply_publisher(csaf_doc: dict, args: Namespace) -> dict:
         publisher["contact_details"] = args.publisher_contact_details
     if args.publisher_issuing_authority:
         publisher["issuing_authority"] = args.publisher_issuing_authority
+    return publisher
+
+
+def apply_publisher(csaf_doc: dict, args: Namespace) -> dict:
+    """
+    Modifies document.publisher
+    """
+    publisher = build_publisher(args)
+    if not publisher:
+        return csaf_doc
 
     csaf_doc.setdefault("document", {})["publisher"] = publisher
     return csaf_doc
@@ -246,3 +265,26 @@ def apply_legal_disclaimer(csaf_doc: dict, args: Namespace) -> dict:
     return csaf_doc
 
 
+def describe_changes(args: Namespace) -> list:
+    """
+    Describes the changes to the document based on the arguments.
+    """
+    changes = []
+
+    if build_publisher(args):
+        changes.append("publisher replaced")
+
+    notes = build_notes(args)
+    if notes:
+        changes.append(f"{len(notes)} note{'s' if len(notes) > 1 else ''} added")
+
+    if args.legal_disclaimer:
+        # unclear if replacing or adding a new one
+        changes.append("legal disclaimer set")
+
+    references = build_references(args)
+    if references:
+        changes.append(
+            f"{len(references)} reference{'s' if len(references) > 1 else ''} added")
+
+    return changes

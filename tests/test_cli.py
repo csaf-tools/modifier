@@ -17,8 +17,10 @@ from csaf_modifier.cli import (
     apply_publisher,
     apply_references,
     build_parser,
+    main,
 )
-from csaf_modifier.modifier import build_notes, build_references
+from csaf_modifier.modifier import (build_notes, build_publisher, build_references,
+                                    describe_changes)
 
 BASIC = json_load((Path(__file__).parent / "csaf_documents/basic.json").open())
 
@@ -28,7 +30,13 @@ def test_basic():
 
 
 def test_empty():
-    apply_always_changes({}, "")
+    """
+    Test the always-applied changes
+    """
+    doc, _ = apply_always_changes({}, "")
+    tracking = doc["document"]["tracking"]
+    assert tracking["version"] == "1"
+    assert len(tracking["revision_history"]) == 1
 
 
 def test_new_id_differs_from_original():
@@ -145,11 +153,79 @@ def test_status_interim():
     assert doc["document"]["tracking"]["status"] == "interim"
 
 
+def test_describe_changes_without_arguments():
+    parser = build_parser()
+    assert describe_changes(parser.parse_args([])) == []
+
+
+@pytest.mark.parametrize("argv,expected", [
+    (["--note-text", "a"], ["1 note added"]),
+    (["--note-text", "a", "--note-text", "b"], ["2 notes added"]),
+    (["--reference-url", "https://example.com/", "--reference-summary", "s"],
+     ["1 reference added"]),
+    (["--legal-disclaimer", "text"], ["legal disclaimer set"]),
+    (["--publisher-category", "vendor", "--publisher-name", "N",
+      "--publisher-namespace", "https://example.com/"], ["publisher replaced"]),
+])
+def test_describe_changes(argv, expected):
+    parser = build_parser()
+    assert describe_changes(parser.parse_args(argv)) == expected
+
+
+def test_describe_changes_order():
+    parser = build_parser()
+    args = parser.parse_args([
+        "--publisher-category", "vendor",
+        "--publisher-name", "N",
+        "--publisher-namespace", "https://example.com/",
+        "--note-text", "a", "--note-text", "b",
+        "--legal-disclaimer", "text",
+        "--reference-url", "https://example.com/", "--reference-summary", "s",
+    ])
+    assert describe_changes(args) == [
+        "publisher replaced",
+        "2 notes added",
+        "legal disclaimer set",
+        "1 reference added",
+    ]
+
+
+def test_revision_summary_fallbacks():
+    parser = build_parser()
+    doc, _ = apply_always_changes(deepcopy(BASIC), "doc.json",
+                                  parser.parse_args([]))
+    assert doc["document"]["tracking"]["revision_history"][-1]["summary"] \
+        == "created a modified version from 1"
+
+
 def test_apply_publisher_requires_all_mandatory_fields():
     parser = build_parser()
     args = parser.parse_args(["--publisher-name", "Foo"])
     with pytest.raises(argparse.ArgumentTypeError):
         doc = apply_publisher(deepcopy(BASIC), args)
+
+
+@pytest.mark.parametrize("args", [
+    # all of them raise ArgumentTypeError
+    ["--publisher-name", "Foo"],
+    ["--note-text", "t", "--note-category", "bogus"],
+    ["--reference-url", "https://example.com/"],
+])
+def test_argument_errors(args, tmp_path, capsys, monkeypatch):
+    """
+    Argument errors should not result in an unhandled exception
+    """
+    doc = tmp_path / "in.json"
+    doc.write_text("{}")
+    monkeypatch.setattr("sys.argv",
+                        ["csaf-modifier", str(doc), "--no-validation"] + args)
+
+    with pytest.raises(SystemExit) as excinfo:
+        main()
+
+    # Exit code 2 are usage errors
+    assert excinfo.value.code == 2
+    assert "csaf-modifier: error:" in capsys.readouterr().err
 
 
 def test_apply_publisher_overrides_when_complete():
@@ -212,6 +288,34 @@ def test_apply_legal_disclaimer_replaces_when_present():
     disclaimers = [n for n in doc["document"]["notes"] if n["category"] == "legal_disclaimer"]
     assert len(disclaimers) == 1
     assert disclaimers[0]["text"] == "new disclaimer"
+
+
+def test_build_publisher_returns_none_without_parameters():
+    parser = build_parser()
+    assert build_publisher(parser.parse_args([])) is None
+
+
+def test_build_publisher_mandatory_and_optional_parameters():
+    parser = build_parser()
+    args = parser.parse_args([
+        "--publisher-category", "vendor",
+        "--publisher-name", "Name",
+        "--publisher-namespace", "https://example.com/",
+        "--publisher-contact-details", "contact@example.com",
+    ])
+    assert build_publisher(args) == {
+        "category": "vendor",
+        "name": "Name",
+        "namespace": "https://example.com/",
+        "contact_details": "contact@example.com",
+    }
+
+
+def test_build_publisher_rejects_incomplete_parameters():
+    parser = build_parser()
+    args = parser.parse_args(["--publisher-name", "Name"])
+    with pytest.raises(argparse.ArgumentTypeError):
+        build_publisher(args)
 
 
 def test_build_notes_defaults_category():

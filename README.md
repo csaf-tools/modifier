@@ -19,11 +19,13 @@ CSAF modifier according to the CSAF 2.0 specification: https://docs.oasis-open.o
     - add new references
 - It always
     - changes the document tracking ID
-    - bumps the major version and adds a revision history entry
+      `publisher replaced, 2 notes added, legal disclaimer set, 1 reference added`
+    - increments the major version
     - sets the status to `final` if the old version required a `draft` status
     - adds a reference to the original CSAF document as the first reference
     - converts the original self-reference into an external one
     - adds a new self-reference for the modified document
+    - adds a revision history entry describing the applied changes, for example:
 - Validates the conformity of the resulting modified CSAF document
 - Writes the result to the output file or stdout
 
