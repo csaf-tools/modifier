@@ -14,10 +14,13 @@ NOTE_CATEGORIES = ['description', 'details', 'faq', 'general', 'other', 'summary
 REFERENCE_CATEGORIES = ['external', 'self']
 
 
-def apply_always_changes(csaf_doc: dict, basepath: str, filename: str) -> (dict, str):
+def apply_always_changes(csaf_doc: dict, basepath: str, filename: str,
+                         args: Namespace = None) -> (dict, str):
     """
     Applies the changes that are always made to a csaf document:
     bump the tracking id & version and rotate the references
+
+    The revision history summary describes the changes derived from args
     """
     d = csaf_doc.setdefault("document", {})
 
@@ -37,10 +40,12 @@ def apply_always_changes(csaf_doc: dict, basepath: str, filename: str) -> (dict,
     dt["id"] = new_id
     if "revision_history" not in dt:
         dt["revision_history"] = []
+    changes = describe_changes(args) if args else []
     dt["revision_history"].append({
         "date": now,
         "number": new_version,
-        "summary": "created a modified version from " + old_id,
+        "summary": ", ".join(changes) if changes
+                   else "created a modified version from " + old_id,
         })
     dt["status"] = "final"  # we are at least version 1 so we must be final
     dt["version"] = new_version
@@ -225,3 +230,26 @@ def apply_legal_disclaimer(csaf_doc: dict, args: Namespace) -> dict:
     return csaf_doc
 
 
+def describe_changes(args: Namespace) -> list:
+    """
+    Describes the changes to the document based on the arguments.
+    """
+    changes = []
+
+    if build_publisher(args):
+        changes.append("publisher replaced")
+
+    notes = build_notes(args)
+    if notes:
+        changes.append(f"{len(notes)} note{'s' if len(notes) > 1 else ''} added")
+
+    if args.legal_disclaimer:
+        # unclear if replacing or adding a new one
+        changes.append("legal disclaimer set")
+
+    references = build_references(args)
+    if references:
+        changes.append(
+            f"{len(references)} reference{'s' if len(references) > 1 else ''} added")
+
+    return changes

@@ -19,7 +19,8 @@ from csaf_modifier.cli import (
     build_parser,
     main,
 )
-from csaf_modifier.modifier import build_notes, build_references
+from csaf_modifier.modifier import (build_notes, build_publisher, build_references,
+                                    describe_changes)
 
 BASIC = json_load((Path(__file__).parent / "csaf_documents/basic.json").open())
 
@@ -29,7 +30,13 @@ def test_basic():
 
 
 def test_empty():
-    apply_always_changes({}, None, "")
+    """
+    Test the always-applied changes
+    """
+    doc, _ = apply_always_changes({}, None, "")
+    tracking = doc["document"]["tracking"]
+    assert tracking["version"] == "1"
+    assert len(tracking["revision_history"]) == 1
 
 
 def test_basepath_used_for_self_reference():
@@ -65,6 +72,51 @@ def test_no_basepath_falls_back_to_bare_filename():
     doc, new_filename = apply_always_changes(deepcopy(BASIC), None, "doc.json")
     self_refs = [r for r in doc["document"]["references"] if r["category"] == "self"]
     assert self_refs[0]["url"] == new_filename.name
+
+
+def test_describe_changes_without_arguments():
+    parser = build_parser()
+    assert describe_changes(parser.parse_args([])) == []
+
+
+@pytest.mark.parametrize("argv,expected", [
+    (["--note-text", "a"], ["1 note added"]),
+    (["--note-text", "a", "--note-text", "b"], ["2 notes added"]),
+    (["--reference-url", "https://example.com/", "--reference-summary", "s"],
+     ["1 reference added"]),
+    (["--legal-disclaimer", "text"], ["legal disclaimer set"]),
+    (["--publisher-category", "vendor", "--publisher-name", "N",
+      "--publisher-namespace", "https://example.com/"], ["publisher replaced"]),
+])
+def test_describe_changes(argv, expected):
+    parser = build_parser()
+    assert describe_changes(parser.parse_args(argv)) == expected
+
+
+def test_describe_changes_order():
+    parser = build_parser()
+    args = parser.parse_args([
+        "--publisher-category", "vendor",
+        "--publisher-name", "N",
+        "--publisher-namespace", "https://example.com/",
+        "--note-text", "a", "--note-text", "b",
+        "--legal-disclaimer", "text",
+        "--reference-url", "https://example.com/", "--reference-summary", "s",
+    ])
+    assert describe_changes(args) == [
+        "publisher replaced",
+        "2 notes added",
+        "legal disclaimer set",
+        "1 reference added",
+    ]
+
+
+def test_revision_summary_fallbacks():
+    parser = build_parser()
+    doc, _ = apply_always_changes(deepcopy(BASIC), None, "doc.json",
+                                  parser.parse_args([]))
+    assert doc["document"]["tracking"]["revision_history"][-1]["summary"] \
+        == "created a modified version from 1"
 
 
 def test_apply_publisher_requires_all_mandatory_fields():

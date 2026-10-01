@@ -20,6 +20,8 @@ CSAF modifier according to the specification: https://docs.oasis-open.org/csaf/c
 - It always
     - changes the document tracking ID
     - adds a reference to the original CSAF document
+    - adds a revision history entry describing the applied changes, for example:
+      `publisher replaced, 2 notes added, legal disclaimer set, 1 reference added`
 - Validates the conformity of the resulting modified CSAF document
 - Writes the result to the output file or stdout
 
