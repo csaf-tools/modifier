@@ -19,8 +19,7 @@ def apply_always_changes(csaf_doc: dict, basepath: str, filename: str) -> (dict,
     Applies the changes that are always made to a csaf document:
     bump the tracking id & version and rotate the references
     """
-    # for easier access
-    d = csaf_doc.get("document", {})
+    d = csaf_doc.setdefault("document", {})
 
     now = rfc3339now()
 
@@ -28,7 +27,7 @@ def apply_always_changes(csaf_doc: dict, basepath: str, filename: str) -> (dict,
     id_prefix = "csaf-modifier-" + datetime.utcnow().strftime("%Y%m%d-%H%M-")
 
     # tracking section: bump version
-    dt = d.get("tracking", {})
+    dt = d.setdefault("tracking", {})
     old_id = dt.get("id", str(uuid4()))
     new_id = id_prefix + old_id
 
